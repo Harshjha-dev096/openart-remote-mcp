@@ -9,8 +9,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+/* =========================
+   MCP TRANSPORT HANDLER
+========================= */
+
+const transportHandler = express.Router();
+
 let browser;
 let page;
+
+/* =========================
+   ROOT CHECK
+========================= */
 
 app.get("/", (req, res) => {
   res.json({
@@ -18,7 +28,22 @@ app.get("/", (req, res) => {
   });
 });
 
-app.post("/mcp/generate", async (req, res) => {
+/* =========================
+   MCP ROOT
+========================= */
+
+transportHandler.get("/", (req, res) => {
+  res.json({
+    name: "openart-mcp",
+    status: "running"
+  });
+});
+
+/* =========================
+   GENERATE IMAGE
+========================= */
+
+transportHandler.post("/generate", async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -28,10 +53,14 @@ app.post("/mcp/generate", async (req, res) => {
       });
     }
 
+    /* Launch browser once */
     if (!browser) {
       browser = await chromium.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox"
+        ]
       });
 
       const context = await browser.newContext();
@@ -39,21 +68,26 @@ app.post("/mcp/generate", async (req, res) => {
       page = await context.newPage();
     }
 
+    /* Open OpenArt */
     await page.goto("https://openart.ai/create", {
       waitUntil: "networkidle"
     });
 
     await page.waitForTimeout(5000);
 
+    /* Find prompt textarea */
     const textarea = await page.locator("textarea").first();
 
+    /* Fill prompt */
     await textarea.fill(prompt);
 
+    /* Submit */
     await page.keyboard.press("Enter");
 
+    /* Wait for generation */
     await page.waitForTimeout(15000);
 
-    res.json({
+    return res.json({
       success: true,
       message: "Image generation started",
       prompt
@@ -62,11 +96,21 @@ app.post("/mcp/generate", async (req, res) => {
   } catch (error) {
     console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: error.message
     });
   }
 });
+
+/* =========================
+   IMPORTANT MCP ROUTE
+========================= */
+
+app.use("/mcp", transportHandler);
+
+/* =========================
+   START SERVER
+========================= */
 
 const PORT = process.env.PORT || 3000;
 
