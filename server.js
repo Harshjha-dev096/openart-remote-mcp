@@ -30,7 +30,8 @@ app.post("/mcp/generate", async (req, res) => {
 
     if (!browser) {
       browser = await chromium.launch({
-        headless: false
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
       });
 
       const context = await browser.newContext();
